@@ -1,17 +1,23 @@
--- name: GetUsers :many
-select * from users limit 10;
+-- name: CreateUser :one
+insert into UserAccount (
+  name, email, password, roleId
+) values (
+  $1, $2, $3, $4
+) returning id, name, email, created_at
+;
 
--- name: GetUserById :one
-select * from users where id = $1 limit 1;
+-- name: FindUsers :many
+select u.id, u.name, u.email, u.created_at, r.name as rolename
+from useraccount as u
+inner join role as r on u.roleid = r.id
+limit 10
+;
 
--- name: GetUserByEmail :one
-select * from users where email = $1 limit 1;
+-- name: FindUserByEmail :one
+select u.id, u.name, u.email, u.created_at, u.password, r.name as rolename
+from useraccount as u
+inner join role as r on u.roleid = r.id
+where u.email = $1
+limit 1
+;
 
--- name: CreateUser :exec
-INSERT INTO users (
-  username,
-  email,
-  password
-) VALUES (
-  $1, $2 , $3
-);

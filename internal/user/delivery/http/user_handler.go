@@ -2,9 +2,13 @@ package user
 
 import (
 	"encoding/json"
-	"net/http"
-	"strconv"
+	"fmt"
 
+	// "fmt"
+	"net/http"
+	// "strconv"
+
+	db "github.com/galihwicaksono90/musikmarching-be/db/sqlc"
 	usecase "github.com/galihwicaksono90/musikmarching-be/internal/user/usecase"
 	response "github.com/galihwicaksono90/musikmarching-be/pkg/response"
 )
@@ -15,34 +19,36 @@ type UserHandler struct {
 
 func (h *UserHandler) FindAll(w http.ResponseWriter, r *http.Request) {
 	users, err := h.usecase.FindAll()
+	r.Context()
 
 	if err != nil {
+		fmt.Println(err)
 		res := response.Response(err.Code, err.Err.Error(), err)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
+
 	res := response.Response(http.StatusOK, http.StatusText(http.StatusOK), users)
+
 	json.NewEncoder(w).Encode(res)
 }
 
-func (h *UserHandler) FindOneById(w http.ResponseWriter, r *http.Request) {
-	id, strconvErr := strconv.ParseInt(r.PathValue("id"), 10, 64)
+func (h *UserHandler) CreateOne(w http.ResponseWriter, r *http.Request) {
+	var createUserParams *db.CreateUserParams
 
-	w.Header().Add("Content-Type", "application/json")
-	if strconvErr != nil {
-		res := response.Response(http.StatusBadRequest, http.StatusText(http.StatusBadRequest), nil)
-		json.NewEncoder(w).Encode(res)
+	if err := json.NewDecoder(r.Body).Decode(&createUserParams); err != nil {
+		json.NewEncoder(w).Encode(response.Response(http.StatusBadRequest, err.Error(), nil))
 		return
 	}
-
-	users, err := h.usecase.FindOneById(id)
+	user, err := h.usecase.CreateOne(createUserParams)
 
 	if err != nil {
-		res := response.Response(err.Code, err.Err.Error(), err)
+		res := response.Response(err.Code, err.Err.Error(), nil)
 		json.NewEncoder(w).Encode(res)
 		return
 	}
-	res := response.Response(http.StatusOK, http.StatusText(http.StatusOK), users)
+
+	res := response.Response(http.StatusCreated, http.StatusText(http.StatusCreated), user)
 	json.NewEncoder(w).Encode(res)
 }
 

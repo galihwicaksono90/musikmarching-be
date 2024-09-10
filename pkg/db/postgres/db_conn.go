@@ -6,20 +6,33 @@ import (
 	"os"
 
 	db "github.com/galihwicaksono90/musikmarching-be/db/sqlc"
-	"github.com/jackc/pgx/v5"
+	// "github.com/jackc/pgx/v5"
+	// "github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 func DB(ctx *context.Context) *db.Queries {
-	dbUrl := "postgres://tony:password@localhost:5432/swaranada-be"
+	dbUrl := "postgres://admin:root@localhost:5432/musikmarching-db"
 
-	conn, err := pgx.Connect(*ctx, dbUrl)
+	config, err := pgxpool.ParseConfig(dbUrl)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 
-	defer conn.Close(*ctx)
+	// defer conn.af(*ctx)
+	// config.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+	// 	fmt.Println("Connected to database")
+	// 	return nil
+	// }
 
-	queries := db.New(conn)
+	pool, err := pgxpool.NewWithConfig(*ctx, config)
+
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
+		os.Exit(1)
+	}
+
+	queries := db.New(pool)
 	return queries
 }

@@ -3,11 +3,14 @@ package user
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 
 	db "github.com/galihwicaksono90/musikmarching-be/db/sqlc"
+	roleUsecase "github.com/galihwicaksono90/musikmarching-be/internal/role/usecase"
 	response "github.com/galihwicaksono90/musikmarching-be/pkg/response"
-	"golang.org/x/crypto/bcrypt"
+	utils "github.com/galihwicaksono90/musikmarching-be/utils"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type userUsecase struct {
@@ -16,15 +19,53 @@ type userUsecase struct {
 }
 
 type UserUsecase interface {
-	FindAll() (*[]db.User, *response.Error)
-	FindOneById(id int64) (*db.User, *response.Error)
-	FindOneByEmail(string) (*db.User, *response.Error)
-	Create(*db.CreateUserParams) *response.Error
+	CreateOne(params *db.CreateUserParams) (*db.CreateUserRow, *response.Error)
+	FindAll() (*[]db.FindUsersRow, *response.Error)
+	FindOneByEmail(email string) (*db.FindUserByEmailRow, *response.Error)
+}
+
+// CreateOne implements UserUsecase.
+func (u *userUsecase) CreateOne(params *db.CreateUserParams) (*db.CreateUserRow, *response.Error) {
+	hashed, err := utils.HashPassword(params.Password.String)
+
+	if err != nil {
+		return nil, &response.Error{
+			Code: http.StatusBadRequest,
+			Err:  errors.New("Failed to hash password"),
+		}
+	}
+
+	role, err := u.db.GetRoleByName(u.ctx, db.RoletypeUser)
+
+	if err != nil {
+		return nil, &response.Error{
+			Code: http.StatusNotFound,
+			Err:  err,
+		}
+	}
+
+	newParams := &db.CreateUserParams{
+		Email:    params.Email,
+		Name:     params.Name,
+		Roleid:   role.ID,
+		Password: pgtype.Text{String: hashed, Valid: true},
+	}
+
+	user, err := u.db.CreateUser(u.ctx, *newParams)
+	if err != nil {
+		return nil, &response.Error{
+			Code: http.StatusBadRequest,
+			Err:  err,
+		}
+	}
+
+	return &user, nil
 }
 
 // FindAll implements UserUsecase.
-func (u *userUsecase) FindAll() (*[]db.User, *response.Error) {
-	users, err := u.db.GetUsers(u.ctx)
+func (u *userUsecase) FindAll() (*[]db.FindUsersRow, *response.Error) {
+	users, err := u.db.FindUsers(u.ctx)
+	fmt.Println(err)
 	if err != nil {
 		return nil, &response.Error{
 			Code: http.StatusNotFound,
@@ -35,72 +76,17 @@ func (u *userUsecase) FindAll() (*[]db.User, *response.Error) {
 }
 
 // FindOneByEmail implements UserUsecase.
-func (u *userUsecase) FindOneByEmail(email string) (*db.User, *response.Error) {
-	user, err := u.db.GetUserByEmail(u.ctx, email)
-
+func (u *userUsecase) FindOneByEmail(email string) (*db.FindUserByEmailRow, *response.Error) {
+	user, err := u.db.FindUserByEmail(u.ctx, email)
 	if err != nil {
 		return nil, &response.Error{
 			Code: http.StatusNotFound,
-			Err:  err,
+			Err:  errors.New("Email not found"),
 		}
 	}
-
 	return &user, nil
 }
 
-// FindOneById implements UserUsecase.
-func (u *userUsecase) FindOneById(id int64) (*db.User, *response.Error) {
-	user, err := u.db.GetUserById(u.ctx, id)
-
-	if err != nil {
-		return nil, &response.Error{
-			Code: http.StatusNotFound,
-			Err:  err,
-		}
-	}
-
-	return &user, nil
-}
-
-// Create implements UserUsecase.
-func (u *userUsecase) Create(params *db.CreateUserParams) *response.Error {
-	userCheck, err := u.db.GetUserByEmail(u.ctx, params.Email)
-	if err != nil || userCheck != (db.User{}) {
-		return &response.Error{
-			Code: http.StatusBadRequest,
-			Err:  errors.New("Email already used"),
-		}
-	}
-
-	hashedPassword, errHashedPassword := bcrypt.GenerateFromPassword(
-		[]byte(params.Password),
-		bcrypt.DefaultCost,
-	)
-
-	if errHashedPassword != nil {
-		return &response.Error{
-			Code: 500,
-			Err:  errHashedPassword,
-		}
-	}
-
-	newUser := db.CreateUserParams{
-		Username: params.Username,
-		Email:    params.Email,
-		Password: string(hashedPassword),
-	}
-
-	err = u.db.CreateUser(u.ctx, newUser)
-
-	if err != nil {
-		return &response.Error{
-			Code: http.StatusBadRequest,
-			Err:  errors.New("Failed to register new user"),
-		}
-	}
-	return nil
-}
-
-func New(ctx context.Context, db *db.Queries) UserUsecase {
+func New(ctx context.Context, db *db.Queries, roleUsecase *roleUsecase.RoleUsecase) UserUsecase {
 	return &userUsecase{db, ctx}
 }
