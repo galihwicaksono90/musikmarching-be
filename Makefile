@@ -1,5 +1,5 @@
 DB_URL=postgres://admin:root@localhost:5432/musikmarching-db?sslmode=disable
-DB_DIR=./db/migrations
+DB_DIR=./db/migration
 
 .PHONY: migration_new 
 migration_new:
