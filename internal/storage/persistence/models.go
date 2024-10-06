@@ -5,16 +5,76 @@
 package persistence
 
 import (
+	"database/sql/driver"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Rolename string
+
+const (
+	RolenameAdmin       Rolename = "admin"
+	RolenameContributor Rolename = "contributor"
+	RolenameUser        Rolename = "user"
+)
+
+func (e *Rolename) Scan(src interface{}) error {
+	switch s := src.(type) {
+	case []byte:
+		*e = Rolename(s)
+	case string:
+		*e = Rolename(s)
+	default:
+		return fmt.Errorf("unsupported scan type for Rolename: %T", src)
+	}
+	return nil
+}
+
+type NullRolename struct {
+	Rolename Rolename `json:"rolename"`
+	Valid    bool     `json:"valid"` // Valid is true if Rolename is not NULL
+}
+
+// Scan implements the Scanner interface.
+func (ns *NullRolename) Scan(value interface{}) error {
+	if value == nil {
+		ns.Rolename, ns.Valid = "", false
+		return nil
+	}
+	ns.Valid = true
+	return ns.Rolename.Scan(value)
+}
+
+// Value implements the driver Valuer interface.
+func (ns NullRolename) Value() (driver.Value, error) {
+	if !ns.Valid {
+		return nil, nil
+	}
+	return string(ns.Rolename), nil
+}
+
 type Account struct {
+	ID         uuid.UUID          `db:"id" json:"id"`
+	Name       string             `db:"name" json:"name"`
+	Email      string             `db:"email" json:"email"`
+	Pictureurl pgtype.Text        `db:"pictureurl" json:"pictureurl"`
+	CreatedAt  time.Time          `db:"created_at" json:"created_at"`
+	UpdatedAt  pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
+	DeletedAt  pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`
+	RoleID     uuid.UUID          `db:"role_id" json:"role_id"`
+}
+
+type Profile struct {
+	ID        uuid.UUID `db:"id" json:"id"`
+	AccountID uuid.UUID `db:"account_id" json:"account_id"`
+}
+
+type Role struct {
 	ID        uuid.UUID          `db:"id" json:"id"`
-	Name      string             `db:"name" json:"name"`
-	Email     string             `db:"email" json:"email"`
+	Name      Rolename           `db:"name" json:"name"`
 	CreatedAt time.Time          `db:"created_at" json:"created_at"`
 	UpdatedAt pgtype.Timestamptz `db:"updated_at" json:"updated_at"`
 	DeletedAt pgtype.Timestamptz `db:"deleted_at" json:"deleted_at"`

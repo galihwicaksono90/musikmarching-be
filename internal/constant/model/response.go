@@ -25,5 +25,5 @@ func Response(code uint, message string, data interface{}) *APIResponse {
 
 type AccountResponseDTO struct {
 	ID    uuid.UUID `json:"id"`
-	Email string    `json:"email"`
+	Email string `json:"email"`
 }

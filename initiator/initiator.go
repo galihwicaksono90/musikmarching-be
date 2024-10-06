@@ -8,18 +8,17 @@ import (
 
 	"github.com/galihwicaksono90/musikmarching-be/internal/constant/routing"
 	accountHandlerV1 "github.com/galihwicaksono90/musikmarching-be/internal/handler/account/http/v1"
+	authHandlerV1 "github.com/galihwicaksono90/musikmarching-be/internal/handler/auth/http/v1"
 	googleOauthHandlerV1 "github.com/galihwicaksono90/musikmarching-be/internal/handler/oauth/http/v1/google"
 	"github.com/galihwicaksono90/musikmarching-be/internal/module/account"
 	"github.com/galihwicaksono90/musikmarching-be/internal/module/oauth/google"
 	db "github.com/galihwicaksono90/musikmarching-be/internal/storage/persistence"
 	"github.com/galihwicaksono90/musikmarching-be/pkg/config"
-	"github.com/galihwicaksono90/musikmarching-be/pkg/db/postgres"
-	"github.com/galihwicaksono90/musikmarching-be/pkg/middleware"
 	routegroup "github.com/galihwicaksono90/musikmarching-be/platform/route_group"
+	"github.com/jackc/pgx/v5"
 
 	"github.com/gorilla/sessions"
 
-	// "github.com/galihwicaksono90/musikmarching-be/platform/routers"
 	"github.com/sirupsen/logrus"
 )
 
@@ -34,17 +33,14 @@ func Init() {
 		logger.Fatalf("%s cannot load config", err.Error())
 	}
 
-	conn, err := postgres.New(ctx, config.DB_SOURCE)
+	conn, err := pgx.Connect(ctx, config.DB_SOURCE)
 	if err != nil {
-		logger.Fatal("%s failed to connect to database", err.Error())
+		logger.Fatalf("%s failed to connect to database", err.Error())
 	}
-
-	defer conn.Close(ctx)
 
 	store := db.NewStore(conn)
 
 	mux := routegroup.New(http.NewServeMux())
-	mux.Use(middleware.LogMiddleware, middleware.ReadCookie)
 
 	mux.HandleFunc("/ping",
 		func(w http.ResponseWriter, r *http.Request) {
@@ -60,6 +56,9 @@ func Init() {
 	apiRoute := mux.Mount("/api/v1")
 	accountHandler := accountHandlerV1.NewAccountHandler(logger, accountUsecase)
 	routing.AccountRouting(accountHandler, apiRoute)
+
+	authHandler := authHandlerV1.NewAuthHandler(logger, accountUsecase)
+	routing.AuthRouting(authHandler, apiRoute)
 
 	port := fmt.Sprintf(":%s", config.PORT)
 

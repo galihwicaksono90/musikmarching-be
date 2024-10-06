@@ -6,12 +6,6 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-func New(ctx context.Context, dbSource string) (*pgx.Conn, error) {
-	conn, err := pgx.Connect(ctx, dbSource)
-
-	if err != nil {
-		return nil, err
-	}
-
-	return conn, nil
+func New(dbSource string) (*pgx.Conn, error) {
+	return pgx.Connect(context.Background(), dbSource)
 }

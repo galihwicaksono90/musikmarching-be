@@ -9,7 +9,6 @@ import (
 	"github.com/galihwicaksono90/musikmarching-be/internal/constant/model"
 	"github.com/galihwicaksono90/musikmarching-be/internal/module/account"
 	oauth "github.com/galihwicaksono90/musikmarching-be/internal/module/oauth/google"
-	db "github.com/galihwicaksono90/musikmarching-be/internal/storage/persistence"
 	"github.com/gorilla/sessions"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
@@ -38,7 +37,7 @@ var store = sessions.NewCookieStore([]byte("something-very-secret"))
 // LoginCallback implements OauthHandler.
 func (o *oauthHandler) LoginCallback(w http.ResponseWriter, r *http.Request) {
 	code := r.URL.Query().Get("code")
-	port := viper.GetString("port")
+	redirectUrl := viper.GetString("GOOGLE_REROUTE_URL")
 
 	client, err := o.usecase.GoogleCallbackClient(code)
 	if err != nil {
@@ -56,35 +55,28 @@ func (o *oauthHandler) LoginCallback(w http.ResponseWriter, r *http.Request) {
 	err = json.NewDecoder(resp.Body).Decode(&a)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
+		o.logger.Error(err)
 		return
 	}
 
-	newAccount, err := o.accountUsecase.UpsertAccount(context.Background(),
-		&db.UpsertAccountParams{
-			Email: a.Email,
-			Name:  a.Name,
-		})
 
+	account, err := o.accountUsecase.UpsertAccount(context.Background(),a)
 	if err != nil {
-		response := model.Response(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), nil)
+		o.logger.Error(err)
+		response := model.Response(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), err)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
 	session, err := store.Get(r, "Session-name")
-
 	if err != nil {
 		response := model.Response(http.StatusInternalServerError, http.StatusText(http.StatusInternalServerError), err)
 		json.NewEncoder(w).Encode(response)
 		return
 	}
 
-	// fmt.Println("======================================================================")
-	// fmt.Println(newAccount.ID.String())
-	// fmt.Println("======================================================================")
-
-	session.Values["id"] = newAccount.ID.String()
-	session.Values["email"] = newAccount.Email
+	session.Values["id"] = account.ID.String()
+	session.Values["email"] = account.Email
 
 	err = session.Save(r, w)
 	if err != nil {
@@ -94,11 +86,7 @@ func (o *oauthHandler) LoginCallback(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	response := model.Response(http.StatusOK, http.StatusText(http.StatusOK), newAccount)
-	json.NewEncoder(w).Encode(response)
 
-	redirectUrl := fmt.Sprintf("http://localhost:%s/ping", port)
-	//
 	http.Redirect(w, r, redirectUrl, http.StatusTemporaryRedirect)
 }
 

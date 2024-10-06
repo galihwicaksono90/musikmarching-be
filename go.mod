@@ -5,7 +5,6 @@ go 1.23
 toolchain go1.23.1
 
 require (
-	github.com/alexedwards/scs/v2 v2.8.0
 	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/sessions v1.4.0

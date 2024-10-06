@@ -9,69 +9,178 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
-const getAccountByEmail = `-- name: GetAccountByEmail :one
-select id, name, email, created_at, updated_at, deleted_at
-from account
-where email = $1
+const createAccount = `-- name: CreateAccount :one
+WITH account_insert AS (
+  INSERT INTO Account (email, name, pictureUrl, role_id)
+  VALUES ($1, $2, $3, $4)
+  RETURNING id
+)
+INSERT INTO Profile as p (account_id)
+SELECT id FROM account_insert
+returning account_id
 `
 
-func (q *Queries) GetAccountByEmail(ctx context.Context, email string) (Account, error) {
+type CreateAccountParams struct {
+	Email      string      `db:"email" json:"email"`
+	Name       string      `db:"name" json:"name"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	Roleid     uuid.UUID   `db:"roleid" json:"roleid"`
+}
+
+func (q *Queries) CreateAccount(ctx context.Context, arg CreateAccountParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createAccount,
+		arg.Email,
+		arg.Name,
+		arg.Pictureurl,
+		arg.Roleid,
+	)
+	var account_id uuid.UUID
+	err := row.Scan(&account_id)
+	return account_id, err
+}
+
+const createAccountOld = `-- name: CreateAccountOld :one
+insert into account as a (email, name, pictureurl, role_id)
+values ($1, $2, $3, $4)
+returning id
+`
+
+type CreateAccountOldParams struct {
+	Email      string      `db:"email" json:"email"`
+	Name       string      `db:"name" json:"name"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	Roleid     uuid.UUID   `db:"roleid" json:"roleid"`
+}
+
+func (q *Queries) CreateAccountOld(ctx context.Context, arg CreateAccountOldParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, createAccountOld,
+		arg.Email,
+		arg.Name,
+		arg.Pictureurl,
+		arg.Roleid,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
+const getAccountByEmail = `-- name: GetAccountByEmail :one
+select 
+  a.id,
+  a.name,
+  a.email,
+  a.pictureurl,
+  r.name as role_name,
+  p.account_id
+from account as a
+inner join role as r on a.role_id = r.id
+inner join profile as p on a.id = p.account_id
+where a.email = $1
+limit 1
+`
+
+type GetAccountByEmailRow struct {
+	ID         uuid.UUID   `db:"id" json:"id"`
+	Name       string      `db:"name" json:"name"`
+	Email      string      `db:"email" json:"email"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	RoleName   Rolename    `db:"role_name" json:"role_name"`
+	AccountID  uuid.UUID   `db:"account_id" json:"account_id"`
+}
+
+func (q *Queries) GetAccountByEmail(ctx context.Context, email string) (GetAccountByEmailRow, error) {
 	row := q.db.QueryRow(ctx, getAccountByEmail, email)
-	var i Account
+	var i GetAccountByEmailRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Email,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
+		&i.Pictureurl,
+		&i.RoleName,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getAccountById = `-- name: GetAccountById :one
-select id, name, email, created_at, updated_at, deleted_at
-from account
-where id = $1
+select 
+  a.id,
+  a.name,
+  a.email,
+  a.pictureurl,
+  r.name as role_name,
+  p.account_id
+from account as a
+inner join role as r on a.role_id = r.id
+inner join profile as p on a.id = p.account_id
+where a.id = $1
+limit 1
 `
 
-func (q *Queries) GetAccountById(ctx context.Context, id uuid.UUID) (Account, error) {
+type GetAccountByIdRow struct {
+	ID         uuid.UUID   `db:"id" json:"id"`
+	Name       string      `db:"name" json:"name"`
+	Email      string      `db:"email" json:"email"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	RoleName   Rolename    `db:"role_name" json:"role_name"`
+	AccountID  uuid.UUID   `db:"account_id" json:"account_id"`
+}
+
+func (q *Queries) GetAccountById(ctx context.Context, id uuid.UUID) (GetAccountByIdRow, error) {
 	row := q.db.QueryRow(ctx, getAccountById, id)
-	var i Account
+	var i GetAccountByIdRow
 	err := row.Scan(
 		&i.ID,
 		&i.Name,
 		&i.Email,
-		&i.CreatedAt,
-		&i.UpdatedAt,
-		&i.DeletedAt,
+		&i.Pictureurl,
+		&i.RoleName,
+		&i.AccountID,
 	)
 	return i, err
 }
 
 const getAccounts = `-- name: GetAccounts :many
-select id, name, email, created_at, updated_at, deleted_at
-from account
+select 
+  a.id,
+  a.name,
+  a.email,
+  a.pictureurl,
+  r.name as role_name,
+  p.account_id
+from account as a
+inner join role as r on a.role_id = r.id
+inner join profile as p on a.id = p.account_id
 `
 
-func (q *Queries) GetAccounts(ctx context.Context) ([]Account, error) {
+type GetAccountsRow struct {
+	ID         uuid.UUID   `db:"id" json:"id"`
+	Name       string      `db:"name" json:"name"`
+	Email      string      `db:"email" json:"email"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	RoleName   Rolename    `db:"role_name" json:"role_name"`
+	AccountID  uuid.UUID   `db:"account_id" json:"account_id"`
+}
+
+func (q *Queries) GetAccounts(ctx context.Context) ([]GetAccountsRow, error) {
 	rows, err := q.db.Query(ctx, getAccounts)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	items := []Account{}
+	items := []GetAccountsRow{}
 	for rows.Next() {
-		var i Account
+		var i GetAccountsRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Name,
 			&i.Email,
-			&i.CreatedAt,
-			&i.UpdatedAt,
-			&i.DeletedAt,
+			&i.Pictureurl,
+			&i.RoleName,
+			&i.AccountID,
 		); err != nil {
 			return nil, err
 		}
@@ -83,21 +192,23 @@ func (q *Queries) GetAccounts(ctx context.Context) ([]Account, error) {
 	return items, nil
 }
 
-const upsertAccount = `-- name: UpsertAccount :one
-insert into account (email, name)
-values ($1, $2)
-on conflict (email) do update
-set name = $2
+const updateAccount = `-- name: UpdateAccount :one
+update account as a
+set 
+  name = coalesce($1, a.name),
+  pictureurl = coalesce($2, a.pictureurl)
+where id = $3
 returning id
 `
 
-type UpsertAccountParams struct {
-	Email string `db:"email" json:"email"`
-	Name  string `db:"name" json:"name"`
+type UpdateAccountParams struct {
+	Name       pgtype.Text `db:"name" json:"name"`
+	Pictureurl pgtype.Text `db:"pictureurl" json:"pictureurl"`
+	ID         uuid.UUID   `db:"id" json:"id"`
 }
 
-func (q *Queries) UpsertAccount(ctx context.Context, arg UpsertAccountParams) (uuid.UUID, error) {
-	row := q.db.QueryRow(ctx, upsertAccount, arg.Email, arg.Name)
+func (q *Queries) UpdateAccount(ctx context.Context, arg UpdateAccountParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, updateAccount, arg.Name, arg.Pictureurl, arg.ID)
 	var id uuid.UUID
 	err := row.Scan(&id)
 	return id, err

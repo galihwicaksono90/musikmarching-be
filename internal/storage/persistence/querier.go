@@ -11,10 +11,13 @@ import (
 )
 
 type Querier interface {
-	GetAccountByEmail(ctx context.Context, email string) (Account, error)
-	GetAccountById(ctx context.Context, id uuid.UUID) (Account, error)
-	GetAccounts(ctx context.Context) ([]Account, error)
-	UpsertAccount(ctx context.Context, arg UpsertAccountParams) (uuid.UUID, error)
+	CreateAccount(ctx context.Context, arg CreateAccountParams) (uuid.UUID, error)
+	CreateAccountOld(ctx context.Context, arg CreateAccountOldParams) (uuid.UUID, error)
+	GetAccountByEmail(ctx context.Context, email string) (GetAccountByEmailRow, error)
+	GetAccountById(ctx context.Context, id uuid.UUID) (GetAccountByIdRow, error)
+	GetAccounts(ctx context.Context) ([]GetAccountsRow, error)
+	GetRoleByName(ctx context.Context, name Rolename) (Role, error)
+	UpdateAccount(ctx context.Context, arg UpdateAccountParams) (uuid.UUID, error)
 }
 
 var _ Querier = (*Queries)(nil)

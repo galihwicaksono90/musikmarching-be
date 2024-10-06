@@ -4,7 +4,6 @@ import (
 	"sync"
 
 	"github.com/jackc/pgx/v5"
-	// "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type Store interface {
@@ -17,7 +16,7 @@ type SQLStore struct {
 	*Queries
 }
 
-// func NewStoree(db *pgxpool.Conn) Store {
+// func NewStore(db *pgx.Conn) Store {
 // 	return &SQLStore{
 // 		db:      db,
 // 		Queries: New(db),
